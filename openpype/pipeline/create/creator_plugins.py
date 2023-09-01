@@ -197,6 +197,10 @@ class BaseCreator:
     # QUESTION make this required?
     host_name = None
 
+    # Settings auto-apply logic related attributes
+    settings_category = None
+    settings_name = None
+
     def __init__(
         self, project_settings, system_settings, create_context, headless=False
     ):
@@ -213,7 +217,47 @@ class BaseCreator:
     def apply_settings(self, project_settings, system_settings):
         """Method called on initialization of plugin to apply settings."""
 
-        pass
+        self.auto_apply_settings(project_settings)
+
+    def auto_apply_settings(self, project_settings):
+        """Default implementation of 'apply_settings'.
+
+        Args:
+            project_settings (dict[str, Any]): Project settings.
+        """
+
+        settings_values = self._get_settings_value(project_settings)
+        if not settings_values:
+            self.log.debug(
+                "No settings found for {}".format(self.__class__.__name__)
+            )
+            return
+
+        for key, value in settings_values.items():
+            setattr(self, key, value)
+
+    def _get_settings_value(self, project_settings):
+        """Extract plugin settings from project settings.
+
+        Creator must have defined 'settings_category' which is top level key
+        of project settings (e.g. 'maya') and 'settings_name' which is key
+        under 'create' key (e.g. 'MayaCreator'), if 'settings_name' is not set
+        a class name is used instead.
+
+        Args:
+            project_settings (dict[str, Any]): Project settings.
+        """
+
+        if self.settings_category is None:
+            return {}
+
+        settings_name = self.settings_name or self.__class__.__name__
+        return (
+            project_settings
+            .get(self.settings_category, {})
+            .get("create", {})
+            .get(settings_name, {})
+        )
 
     @property
     def identifier(self):
