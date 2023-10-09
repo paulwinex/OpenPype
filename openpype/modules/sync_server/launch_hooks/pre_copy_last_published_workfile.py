@@ -186,6 +186,13 @@ class CopyLastPublishedWorkfile(PreLaunchHook):
         # Keep source filepath for further path conformation
         self.data["source_filepath"] = last_published_workfile_path
 
+        published_resources_dir = (
+            os.path.join(os.path.dirname(last_published_workfile_path),
+                         "resources"))
+
+        if not os.path.exists(published_resources_dir):
+            return
+
         # Get resources directory
         resources_dir = os.path.join(
             os.path.dirname(local_workfile_path), 'resources'
@@ -194,34 +201,23 @@ class CopyLastPublishedWorkfile(PreLaunchHook):
         if not os.path.exists(resources_dir):
             os.mkdir(resources_dir)
 
-        # Copy resources to the local resources directory
-        for file in workfile_representation['files']:
-            # Get resource main path
-            resource_main_path = file["path"].replace(
-                "{root[main]}", str(anatomy.roots["main"])
-            )
-
-            # Only copy if the resource file exists, and it's not the workfile
-            if (
-                not os.path.exists(resource_main_path)
-                and not resource_main_path != last_published_workfile_path
-            ):
-                continue
-
+        for entry in os.listdir(published_resources_dir):
+            resource_publish_path = os.path.join(published_resources_dir,
+                                                 entry)
             # Get resource file basename
-            resource_basename = os.path.basename(resource_main_path)
+            resource_basename = os.path.basename(entry)
 
             # Get resource path in workfile folder
             resource_work_path = os.path.join(
                 resources_dir, resource_basename
             )
-            if not os.path.exists(resource_work_path):
-                continue
 
             # Check if the resource file already exists
             # in the workfile resources folder,
             # and both files are the same.
-            if filecmp.cmp(resource_main_path, resource_work_path):
+            if not os.path.exists(resource_work_path):
+                shutil.copy(resource_publish_path, resource_work_path)
+            elif filecmp.cmp(resource_publish_path, resource_work_path):
                 self.log.warning(
                     'Resource "{}" already exists.'
                     .format(resource_basename)
@@ -250,6 +246,3 @@ class CopyLastPublishedWorkfile(PreLaunchHook):
                 else:
                     # Rename existing resource file to `resource_name.old`
                     shutil.move(resource_work_path, resource_path_old)
-
-        # Copy resource file to workfile resources folder
-        shutil.copy(resource_main_path, resources_dir)
